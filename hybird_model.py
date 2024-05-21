@@ -110,7 +110,6 @@ def objective(trial):
 from PyEMD import EEMD
 import numpy as np
 
-# 定义EEMDProcessor结构体
 class EEMDProcessor:
     def __init__(self):
         self.eemd = EEMD()

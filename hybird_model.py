@@ -107,91 +107,17 @@ def objective(trial):
 
     return mse
 
-class AdaptiveNormalization:
-    def __init__(self, window_length=2, MA_type='ema', k=1.0, q1=25, q3=75):
-        self.window_length = window_length
-        self.MA_type = MA_type
-        self.k = k
-        self.q1 = q1
-        self.q3 = q3
+from PyEMD import EEMD
+import numpy as np
 
-    def calculate_adjustment_level(self, S, DSWs):
-        adjustment_levels = []
-        for i in range(len(S)):
-            numerator_sum = 0
-            denominator_sum = 0
-
-            for l in range(len(DSWs)):
-                num_ij = self.calculate_numerator(S[i], DSWs[l])
-                den_ij = self.calculate_denominator(S[i], DSWs[l])
-
-                if den_ij is not None and den_ij != 0:
-                    numerator_sum += num_ij
-                    denominator_sum += den_ij
-
-            if denominator_sum != 0:
-                adjustment_level_i = abs(numerator_sum / denominator_sum - 1) / len(DSWs)
-                adjustment_levels.append(adjustment_level_i)
-
-        return adjustment_levels
-
-    def calculate_numerator(self, value, DSW):
-        if self.MA_type == "SMA":
-            return sum(DSW) / len(DSW)
-        elif self.MA_type == "EMA":
-            alpha = 2 / (self.k + 1)
-            num = sum(value * alpha * (1 - alpha) ** i * DSW[-(i + 1)] for i in range(len(DSW)))
-            return num
-
-    def calculate_denominator(self, value, DSW):
-        if self.MA_type == "SMA":
-            return sum(DSW) / len(DSW)
-        elif self.MA_type == "EMA":
-            alpha = 2 / (self.k + 1)
-            den = sum(alpha * (1 - alpha) ** i * DSW[-(i + 1)] for i in range(len(DSW)))
-            return den if den != 0 else 1e-10  # Avoid division by zero
-
-    def calculate_moving_average(self, sequence):
-        if self.MA_type == 'sma':
-            return np.convolve(sequence, np.ones(self.window_length)/self.window_length, mode='valid')
-        elif self.MA_type == 'ema':
-            alpha = 2 / (self.window_length + 1)
-            weights = np.exp(np.linspace(-1.0, 0.0, self.window_length) * alpha)
-            weights /= weights.sum()
-            return np.convolve(sequence, weights, mode='valid')
-
-    def select_best_moving_average(self, data):
-        best_moving_average = np.mean(data)
-        best_adjustment_level = float('inf')
-
-        for order in range(1, self.window_length):
-            moving_averages = self.calculate_moving_average(data)
-            adjustment_levels = self.calculate_adjustment_level(data, moving_averages)
-
-            if adjustment_levels and min(adjustment_levels) is not None and min(adjustment_levels) < best_adjustment_level:
-                best_moving_average = moving_averages
-                best_adjustment_level = min(adjustment_levels)
-
-        return best_moving_average, best_adjustment_level
-
-    def remove_outliers(self, data):
-        if data is not None:
-            q1 = np.percentile(data, self.q1)
-            q3 = np.percentile(data, self.q3)
-            iqr = q3 - q1
-            lower_bound = q1 - 1.5 * iqr
-            upper_bound = q3 + 1.5 * iqr
-            return [value for value in data if lower_bound <= value <= upper_bound]
-        else:
-            return []
-
-    def normalize_data(self, data):
-        if data is not None and len(data) > 0:
-            scaler = MinMaxScaler(feature_range=(-1, 1))
-            normalized_data = scaler.fit_transform(np.array(data).reshape(-1, 1))
-            return normalized_data, scaler
-        else:
-            return [], None
-
-    def denormalize_values(self, normalized_values, scaler):
-        return scaler.inverse_transform(normalized_values) if normalized_values is not None else None
+# 定义EEMDProcessor结构体
+class EEMDProcessor:
+    def __init__(self):
+        self.eemd = EEMD()
+    
+    def find_k(self, signal):
+        # 执行EEMD分解
+        self.eIMFs = self.eemd(signal)
+        self.rows, self.cols = self.eIMFs.shape
+        # rows is the definition of dimension in vmd
+        return self.rows
